@@ -1,9 +1,41 @@
 
+## [5.4.0] - 2024-09-23
+
+### Changed
+- **Breaking change** Drop support of Node.js 12. The version [5.3.5](https://github.com/reportportal/agent-js-cypress/releases/tag/v5.3.5) is the latest that supports it.
+- The agent now supports reporting the time for launches, test items and logs with microsecond precision in the ISO string format.
+For logs, microsecond precision is available on the UI from ReportPortal version 24.2.
+- `@reportportal/client-javascript` bumped to version `5.3.0`.
+
+## [5.3.5] - 2024-09-11
+### Added
+- `videoCompression` option. Allows compressing Cypress videos before uploading them to the ReportPortal. Check the readme for details. Thanks to [ashvinjaiswal](https://github.com/ashvinjaiswal).
+
+## [5.3.4] - 2024-08-29
+### Fixed
+- Video attachment won't play after downloading, resolves [#202](https://github.com/reportportal/agent-js-cypress/issues/202). Thanks to [ashvinjaiswal](https://github.com/ashvinjaiswal).
+
+## [5.3.3] - 2024-08-15
+### Added
+- `uploadVideo` option. Allows uploading Cypress videos for specs. Check the readme for details.
+
+## [5.3.2] - 2024-07-01
+### Fixed
+- Launch finishing for tests annotated with '.skip'.
+
+## [5.3.1] - 2024-06-24
+### Fixed
+- [#192](https://github.com/reportportal/agent-js-cypress/issues/192). Reporter procreates an enormous amount of processes during execution. Thanks to [epam-avramenko](https://github.com/epam-avramenko).
+### Changed
+- `@reportportal/client-javascript` bumped to version `5.1.4`, new `launchUuidPrintOutput` types introduced: 'FILE', 'ENVIRONMENT'.
+
 ## [5.3.0] - 2024-05-07
 ### Added
 - `cucumberStepStart` and `cucumberStepEnd` commands for reporting `cypress-cucumber-preprocessor` scenario steps as nested steps in RP.
 ### Security
 - Updated versions of vulnerable packages (@reportportal/client-javascript, glob).
+### Deprecated
+- Node.js 12 usage. This minor version is the latest that supports Node.js 12.
 
 ## [5.2.0] - 2024-03-21
 ### Fixed

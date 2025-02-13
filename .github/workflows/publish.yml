@@ -26,8 +26,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
-      - name: Install of node dependencies
+          node-version: 20
+      - name: Install dependencies
         run: npm install
       - name: Run lint
         run: npm run lint
@@ -43,9 +43,9 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           registry-url: 'https://registry.npmjs.org'
-      - name: Install of node dependencies
+      - name: Install dependencies
         run: npm install
       - name: Publish to NPM
         run: |
@@ -57,7 +57,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           registry-url: 'https://npm.pkg.github.com'
           scope: '@reportportal'
       - name: Publish to GPR

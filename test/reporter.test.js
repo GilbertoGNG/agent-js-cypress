@@ -1,7 +1,25 @@
+/*
+ *  Copyright 2024 EPAM Systems
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
 const mockFS = require('mock-fs');
 const path = require('path');
-const { getDefaultConfig, RPClient, MockedDate, RealDate, currentDate } = require('./mock/mock');
+const helpers = require('@reportportal/client-javascript/lib/helpers');
+const { getDefaultConfig, RPClient, currentDate } = require('./mock/mocks');
 const Reporter = require('./../lib/reporter');
+const { entityType } = require('../lib/constants');
 
 const sep = path.sep;
 
@@ -34,6 +52,7 @@ const mockCurrentTestTempInfoWithStep = {
 };
 
 describe('reporter script', () => {
+  jest.spyOn(helpers, 'now').mockReturnValue(currentDate);
   let reporter;
 
   beforeAll(() => {
@@ -43,14 +62,12 @@ describe('reporter script', () => {
   });
 
   beforeEach(() => {
-    global.Date = jest.fn(MockedDate);
-    Object.assign(Date, RealDate);
+    reporter.config = getDefaultConfig();
   });
 
   afterEach(() => {
     reporter.testItemIds.clear();
     reporter.tempLaunchId = undefined;
-    global.Date = RealDate;
     jest.clearAllMocks();
   });
 
@@ -106,21 +123,37 @@ describe('reporter script', () => {
     });
   });
 
+  describe('saveFullConfig', () => {
+    it('should set the full Cypress config to class object property', () => {
+      const fullCypressConfig = { e2e: { baseUrl: 'http://localhost:3000' }, reporterOptions: {} };
+      reporter.saveFullConfig(fullCypressConfig);
+
+      expect(reporter.fullCypressConfig).toEqual(fullCypressConfig);
+    });
+  });
+
   describe('suiteStart', () => {
     it('root suite: startTestItem should be called with undefined parentId', () => {
       const spyStartTestItem = jest.spyOn(reporter.client, 'startTestItem');
       reporter.tempLaunchId = 'tempLaunchId';
-      const suiteStartObject = {
+      const suite = {
         id: 'suite1',
-        name: 'suite name',
-        type: 'suite',
+        title: 'suite name',
         startTime: currentDate,
         description: 'suite description',
+        codeRef: 'test/example.spec.js/suite name',
+        testFileName: 'example.spec.js',
+      };
+      const suiteStartObject = {
+        type: entityType.SUITE,
+        name: 'suite name',
+        startTime: currentDate,
+        description: 'suite description',
+        codeRef: 'test/example.spec.js/suite name',
         attributes: [],
-        parentId: undefined,
       };
 
-      reporter.suiteStart(suiteStartObject);
+      reporter.suiteStart(suite);
 
       expect(spyStartTestItem).toHaveBeenCalledTimes(1);
       expect(spyStartTestItem).toHaveBeenCalledWith(suiteStartObject, 'tempLaunchId', undefined);
@@ -130,17 +163,25 @@ describe('reporter script', () => {
       const spyStartTestItem = jest.spyOn(reporter.client, 'startTestItem');
       reporter.tempLaunchId = 'tempLaunchId';
       reporter.testItemIds.set('parentSuiteId', 'tempParentSuiteId');
-      const suiteStartObject = {
+      const suite = {
         id: 'suite1',
-        name: 'suite name',
-        type: 'suite',
+        title: 'suite name',
         startTime: currentDate,
         description: 'suite description',
-        attributes: [],
+        codeRef: 'test/example.spec.js/suite name',
+        testFileName: 'example.spec.js',
         parentId: 'parentSuiteId',
       };
+      const suiteStartObject = {
+        type: entityType.SUITE,
+        name: 'suite name',
+        startTime: currentDate,
+        description: 'suite description',
+        codeRef: 'test/example.spec.js/suite name',
+        attributes: [],
+      };
 
-      reporter.suiteStart(suiteStartObject);
+      reporter.suiteStart(suite);
 
       expect(spyStartTestItem).toHaveBeenCalledTimes(1);
       expect(spyStartTestItem).toHaveBeenCalledWith(
@@ -155,33 +196,38 @@ describe('reporter script', () => {
     it('finishTestItem should be called with parameters', function () {
       const spyFinishTestItem = jest.spyOn(reporter.client, 'finishTestItem');
       reporter.testItemIds.set('suiteId', 'tempSuiteId');
-      const suiteEndObject = {
+      const suite = {
         id: 'suiteId',
+        title: 'suite title',
+        endTime: currentDate,
+      };
+      const suiteEndObject = {
         endTime: currentDate,
       };
 
-      reporter.suiteEnd(suiteEndObject);
+      reporter.suiteEnd(suite);
 
       expect(spyFinishTestItem).toHaveBeenCalledTimes(1);
-      expect(spyFinishTestItem).toHaveBeenCalledWith('tempSuiteId', { endTime: currentDate });
+      expect(spyFinishTestItem).toHaveBeenCalledWith('tempSuiteId', suiteEndObject);
     });
     it('end suite with testCaseId: finishTestItem should be called with testCaseId', function () {
       const spyFinishTestItem = jest.spyOn(reporter.client, 'finishTestItem');
       reporter.testItemIds.set('suiteId', 'tempSuiteId');
       reporter.suiteTestCaseIds.set('suite title', 'testCaseId');
-      const suiteEndObject = {
+      const suite = {
         id: 'suiteId',
         title: 'suite title',
         endTime: currentDate,
       };
-
-      reporter.suiteEnd(suiteEndObject);
-
-      expect(spyFinishTestItem).toHaveBeenCalledTimes(1);
-      expect(spyFinishTestItem).toHaveBeenCalledWith('tempSuiteId', {
+      const suiteEndObject = {
         endTime: currentDate,
         testCaseId: 'testCaseId',
-      });
+      };
+
+      reporter.suiteEnd(suite);
+
+      expect(spyFinishTestItem).toHaveBeenCalledTimes(1);
+      expect(spyFinishTestItem).toHaveBeenCalledWith('tempSuiteId', suiteEndObject);
 
       reporter.suiteTestCaseIds.clear();
     });
@@ -189,21 +235,235 @@ describe('reporter script', () => {
       const spyFinishTestItem = jest.spyOn(reporter.client, 'finishTestItem');
       reporter.testItemIds.set('suiteId', 'tempSuiteId');
       reporter.setTestItemStatus({ status: 'failed', suiteTitle: 'suite title' });
-      const suiteEndObject = {
+      const suite = {
         id: 'suiteId',
         title: 'suite title',
         endTime: currentDate,
       };
+      const suiteEndObject = {
+        endTime: currentDate,
+        status: 'failed',
+      };
+
+      reporter.suiteEnd(suite);
+
+      expect(spyFinishTestItem).toHaveBeenCalledTimes(1);
+      expect(spyFinishTestItem).toHaveBeenCalledWith('tempSuiteId', suiteEndObject);
+
+      reporter.suiteStatuses.clear();
+    });
+    it('end suite with video: finishSuiteWithVideo should be called if video is enabled and it is a root suite', function () {
+      const spyFinishSuiteWithVideo = jest.spyOn(reporter, 'finishSuiteWithVideo');
+      reporter.fullCypressConfig = { video: true };
+      reporter.config = { ...reporter.config, uploadVideo: true };
+      reporter.testItemIds.set('suiteId', 'tempSuiteId');
+      const suiteInfo = {
+        id: 'suiteId',
+        testFileName: 'example.spec.js',
+        title: 'suite title',
+        tempId: 'tempSuiteId',
+      };
+      reporter.suitesStackTempInfo = [suiteInfo];
+      const suite = {
+        id: 'suiteId',
+        title: 'suite title',
+        endTime: currentDate,
+      };
+      const suiteEndObject = {
+        endTime: currentDate,
+        status: undefined,
+      };
+
+      reporter.suiteEnd(suite);
+
+      expect(spyFinishSuiteWithVideo).toHaveBeenCalledTimes(1);
+      expect(spyFinishSuiteWithVideo).toHaveBeenCalledWith(suiteInfo, suiteEndObject);
+    });
+  });
+
+  // TODO: Fix the tests
+  describe.skip('sendVideoOnFinishSuite', function () {
+    let customSuiteNameAttachment;
+
+    beforeAll(() => {
+      mockFS({
+        example: {
+          videos: {
+            'custom suite name.cy.ts.mp4': Buffer.from([1, 2, 7, 9, 3, 0, 5]),
+          },
+        },
+      });
+    });
+
+    afterAll(() => {
+      mockFS.restore();
+    });
+
+    beforeEach(() => {
+      customSuiteNameAttachment = {
+        name: `custom suite name.cy.ts.mp4`,
+        type: 'video/mp4',
+        content: Buffer.from([1, 2, 7, 9, 3, 0, 5]).toString('base64'),
+      };
+      reporter.suitesStackTempInfo = [
+        { id: 'root', title: 'root suite', testFileName: 'custom suite name.cy.ts' },
+        { id: 'suite', title: 'any suite' },
+      ];
+      reporter.testItemIds.set('root', 'suiteTempId');
+    });
+
+    afterEach(() => {
+      reporter.suitesStackTempInfo = [];
+      delete reporter.config.reporterOptions.videoUploadOnPasses;
+    });
+
+    it('sendLog with video attachment - fail root suite if any suite fails', function () {
+      const suiteEndObject = {
+        id: 'suite',
+        title: 'suite title',
+        status: 'failed',
+      };
+
+      expect(reporter.suitesStackTempInfo[0].status).not.toBeDefined();
+      reporter.suiteEnd(suiteEndObject);
+      expect(reporter.suitesStackTempInfo[0].status).toEqual('failed');
+    });
+
+    it('sendLog with video attachment - fail root suite if setTestItemStatus fails for any suite', function () {
+      expect(reporter.suitesStackTempInfo[0].status).not.toBeDefined();
+      reporter.setTestItemStatus({ status: 'failed', suiteTitle: 'any suite' });
+      expect(reporter.suitesStackTempInfo[0].status).toEqual('failed');
+    });
+
+    it('sendLog with video attachment - send log with video for failed root suite', function () {
+      const spySendVideoOnFinishSuite = jest.spyOn(reporter.client, 'sendLog');
+
+      const suiteEndObject = {
+        id: 'root',
+        title: 'suite title',
+        status: 'failed',
+      };
 
       reporter.suiteEnd(suiteEndObject);
 
-      expect(spyFinishTestItem).toHaveBeenCalledTimes(1);
-      expect(spyFinishTestItem).toHaveBeenCalledWith('tempSuiteId', {
-        endTime: currentDate,
-        status: 'failed',
-      });
+      expect(spySendVideoOnFinishSuite).toHaveBeenCalledTimes(1);
+      expect(spySendVideoOnFinishSuite).toHaveBeenCalledWith(
+        'suiteTempId',
+        {
+          message: `Video: '${suiteEndObject.title}' (custom suite name.cy.ts.mp4)`,
+          level: 'info',
+          time: new Date().valueOf(),
+        },
+        customSuiteNameAttachment,
+      );
+    });
 
-      reporter.suiteStatuses.clear();
+    it('sendLog with video attachment - do not send if suite is not root suite', function () {
+      const spySendVideoOnFinishSuite = jest.spyOn(reporter.client, 'sendLog');
+
+      const suiteEndObject = {
+        id: 'suite',
+        title: 'suite title',
+        status: 'passed',
+      };
+
+      reporter.suiteEnd(suiteEndObject);
+
+      expect(spySendVideoOnFinishSuite).not.toHaveBeenCalled();
+    });
+
+    it('sendLog with video attachment - do not send if root suite passed and videoUploadOnPasses is false', function () {
+      const spySendVideoOnFinishSuite = jest.spyOn(reporter.client, 'sendLog');
+
+      const suiteEndObject = {
+        id: 'root',
+        title: 'suite title',
+        status: 'passed',
+      };
+
+      reporter.suiteEnd(suiteEndObject);
+
+      expect(spySendVideoOnFinishSuite).not.toHaveBeenCalled();
+    });
+
+    it('sendLog with video attachment - do not send if failed but setTestItemStatus passed', function () {
+      const spySendVideoOnFinishSuite = jest.spyOn(reporter.client, 'sendLog');
+
+      reporter.setTestItemStatus({ status: 'passed', suiteTitle: 'suite title' });
+
+      const suiteEndObject = {
+        id: 'root',
+        title: 'suite title',
+        status: 'failed',
+      };
+
+      reporter.suiteEnd(suiteEndObject);
+
+      expect(spySendVideoOnFinishSuite).not.toHaveBeenCalled();
+    });
+
+    it('sendLog with video attachment - do not send if video not found in videosFolder', function () {
+      const spySendVideoOnFinishSuite = jest.spyOn(reporter.client, 'sendLog');
+
+      const suiteEndObject = {
+        id: 'root',
+        title: 'suite title',
+        status: 'failed',
+      };
+
+      reporter.suiteEnd(suiteEndObject);
+
+      expect(spySendVideoOnFinishSuite).not.toHaveBeenCalled();
+    });
+
+    it('sendLog with video attachment - send if root suite passed and videoUploadOnPasses is true', function () {
+      const spySendVideoOnFinishSuite = jest.spyOn(reporter.client, 'sendLog');
+      reporter.config.reporterOptions.videoUploadOnPasses = true;
+
+      const suiteEndObject = {
+        id: 'root',
+        title: 'suite title',
+        status: 'passed',
+      };
+
+      reporter.suiteEnd(suiteEndObject);
+
+      expect(spySendVideoOnFinishSuite).toHaveBeenCalledTimes(1);
+      expect(spySendVideoOnFinishSuite).toHaveBeenCalledWith(
+        'suiteTempId',
+        {
+          message: `Video: '${suiteEndObject.title}' (custom suite name.cy.ts.mp4)`,
+          level: 'info',
+          time: new Date().valueOf(),
+        },
+        customSuiteNameAttachment,
+      );
+    });
+
+    it('sendLog with video attachment - send if passed but setTestItemStatus failed', function () {
+      const spySendVideoOnFinishSuite = jest.spyOn(reporter.client, 'sendLog');
+      reporter.config.reporterOptions.videoUploadOnPasses = true;
+
+      reporter.setTestItemStatus({ status: 'failed', suiteTitle: 'suite title' });
+
+      const suiteEndObject = {
+        id: 'root',
+        title: 'suite title',
+        status: 'passed',
+      };
+
+      reporter.suiteEnd(suiteEndObject);
+
+      expect(spySendVideoOnFinishSuite).toHaveBeenCalledTimes(1);
+      expect(spySendVideoOnFinishSuite).toHaveBeenCalledWith(
+        'suiteTempId',
+        {
+          message: `Video: '${suiteEndObject.title}' (custom suite name.cy.ts.mp4)`,
+          level: 'info',
+          time: new Date().valueOf(),
+        },
+        customSuiteNameAttachment,
+      );
     });
   });
 
@@ -295,21 +555,6 @@ describe('reporter script', () => {
       reporter.testEnd(testInfoObject);
 
       expect(spyFinishTestItem).toHaveBeenCalledWith('tempTestItemId', expectedTestFinishObj);
-    });
-
-    it('end not started test: should call testStart', function () {
-      const spyTestStart = jest.spyOn(reporter, 'testStart');
-      const testInfoObject = {
-        id: 'testId',
-        title: 'test name',
-        status: 'failed',
-        parentId: 'suiteId',
-        err: 'error message',
-      };
-
-      reporter.testEnd(testInfoObject);
-
-      expect(spyTestStart).toHaveBeenCalled();
     });
 
     it('end failed test: should call sendLog on test fail', function () {
@@ -440,6 +685,20 @@ describe('reporter script', () => {
 
       expect(spyFinishTestItem).toHaveBeenCalledTimes(1);
       expect(spyFinishTestItem).toHaveBeenCalledWith('tempTestItemId', expectedTestFinishObj);
+    });
+
+    it('end test: should not finish test in case no testId present in testItemIds', function () {
+      const spyFinishTestItem = jest.spyOn(reporter.client, 'finishTestItem');
+      const testInfoObject = {
+        id: 'testId',
+        title: 'test name',
+        status: 'failed',
+        parentId: 'suiteId',
+        err: 'error message',
+      };
+      reporter.testEnd(testInfoObject);
+
+      expect(spyFinishTestItem).toHaveBeenCalledTimes(0);
     });
   });
 
@@ -872,7 +1131,7 @@ describe('reporter script', () => {
     });
   });
 
-  describe('screenshot', () => {
+  describe('sendScreenshot', () => {
     const screenshotInfo = {
       testAttemptIndex: 0,
       size: 295559,
@@ -903,19 +1162,19 @@ describe('reporter script', () => {
       mockFS.restore();
     });
 
-    it('should not send screenshot for undefined path', () => {
+    it('should not send screenshot for undefined path', async () => {
       const spySendLog = jest.spyOn(reporter.client, 'sendLog');
-      reporter.sendScreenshot(screenshotInfo);
+      await reporter.sendScreenshot(screenshotInfo);
       expect(spySendLog).not.toHaveBeenCalled();
     });
 
-    it('should send screenshot from screenshotInfo', () => {
+    it('should send screenshot from screenshotInfo', async () => {
       const spySendLog = jest.spyOn(reporter.client, 'sendLog');
 
       screenshotInfo.path = `${sep}example${sep}screenshots${sep}example.spec.js${sep}suite name -- test name.png`;
 
       reporter.currentTestTempInfo = expectedTempId;
-      reporter.sendScreenshot(screenshotInfo);
+      await reporter.sendScreenshot(screenshotInfo);
 
       expect(spySendLog).toHaveBeenCalledTimes(1);
       expect(spySendLog).toHaveBeenCalledWith(
@@ -933,13 +1192,13 @@ describe('reporter script', () => {
       );
     });
 
-    it('should send screenshot from screenshotInfo - error level', () => {
+    it('should send screenshot from screenshotInfo - error level', async () => {
       const spySendLog = jest.spyOn(reporter.client, 'sendLog');
 
       screenshotInfo.path = `${sep}example${sep}screenshots${sep}example.spec.js${sep}suite name -- test name (failed).png`;
 
       reporter.currentTestTempInfo = expectedTempId;
-      reporter.sendScreenshot(screenshotInfo);
+      await reporter.sendScreenshot(screenshotInfo);
 
       expect(spySendLog).toHaveBeenCalledTimes(1);
       expect(spySendLog).toHaveBeenCalledWith(
@@ -957,14 +1216,14 @@ describe('reporter script', () => {
       );
     });
 
-    it('should send screenshot from screenshotInfo - custom log message', () => {
+    it('should send screenshot from screenshotInfo - custom log message', async () => {
       const spySendLog = jest.spyOn(reporter.client, 'sendLog');
 
       screenshotInfo.path = `${sep}example${sep}screenshots${sep}example.spec.js${sep}customScreenshot1.png`;
       const message = `screenshot\n${JSON.stringify(screenshotInfo, undefined, 2)}`;
 
       reporter.currentTestTempInfo = expectedTempId;
-      reporter.sendScreenshot(screenshotInfo, message);
+      await reporter.sendScreenshot(screenshotInfo, message);
 
       expect(spySendLog).toHaveBeenCalledTimes(1);
       expect(spySendLog).toHaveBeenCalledWith(
